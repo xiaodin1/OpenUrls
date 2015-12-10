@@ -72,6 +72,7 @@ public class Downloader extends Thread {
 	        // 完毕，关闭所有链接  
 	        is.close();
 	        raf.close();
+	        System.out.println("线程:" + this.id + " 执行成功！！");
         } catch (Exception e) {
 			if(callback != null) {
 				callback.onException(this, e);	//出现异常，丢给主线程（如果是TimeOutException，重新添加）

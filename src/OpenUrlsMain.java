@@ -76,52 +76,63 @@ public class OpenUrlsMain {
     			    	if(!subDir.exists()) {
     			    		subDir.mkdirs();
     			    	}
-    			    	//解析当前帖子的所有图片
-    			    	String postUrl = posts.get(i);
-    			    	String code = htmlTool.getHtmlCodeOfPost(postUrl);
-    			    	List<String> images = htmlTool.parseImagesUrlFromPost(code);
-    			    	//创建回调对象（处理失败）
-    			    	IDownloaderCallback callback = new IDownloaderCallback() {
-							
-							@Override
-							public void onException(Downloader d, Exception e) {
-								System.out.println("线程出错：" + d.id + " " + e);
-								if(d.tryTimes < Downloader.MAX_TRY_TIMES) {
-									Downloader dd = new Downloader(d.id, d.raf, d.imgUrl, d.tryTimes + 1, d.callback);
-									executor.execute(dd);
-									System.out.println("线程重试：" + d.id + "第" + d.tryTimes + "次");
-								} else {
-									System.out.println("线程：" + d.id + " 达到最大重试限制，无法下载：" + d.imgUrl);
-								}
-							}
-						};
-    			    	for(int j = 0; j < images.size(); j++) {
-    			    		//循环创建下载线程
-    			    		String imgUrl = images.get(i);
-    			    		int id = (i - 1) * 100 + j + 1;
-    			    		RandomAccessFile raf;
-							try {
-								raf = new RandomAccessFile(subDir.getPath()+"\\"+ String.format("%3d.jpg",j + 1), "rw");
-								Downloader d = new Downloader(id, raf, imgUrl, 1, callback);
-	    			    		executor.execute(d);
-							} catch (FileNotFoundException e1) {
-								e1.printStackTrace();
-							}
-    			    	}
-    			    	//写BT种子文件
-    			    	File btTxt = new File(subDir.getAbsolutePath() + "\\" + folderName + ".txt");
     					try {
-							BufferedWriter bw = new BufferedWriter(new FileWriter(btTxt));
-							String bt = htmlTool.parseBTSeedUrlFromPost(code);
-						} catch (IOException e1) {
-							e1.printStackTrace();
-						}
+    						//创建信息录入的Writer（写入帖子链接，图片链接，BT种子。防止出现疏漏）
+        			    	File infoTxt = new File(subDir.getAbsolutePath() + "\\" + folderName + ".txt");
+							BufferedWriter bw = new BufferedWriter(new FileWriter(infoTxt));
+	    			    	//解析当前帖子的所有图片
+	    			    	String postUrl = posts.get(i);
+	    			    	bw.write(postUrl + "\r\n\r\n");
+	    			    	String code = htmlTool.getHtmlCodeOfPost(postUrl);
+	    			    	System.out.println("成功！取到帖子code，开始解析");
+	    			    	List<String> images = htmlTool.parseImagesUrlFromPost(code);
+	    			    	if(images == null || images.size() == 0) {
+	    			    		continue;
+	    			    	}
+	    			    	//创建回调对象（处理失败）
+	    			    	IDownloaderCallback callback = new IDownloaderCallback() {
+								@Override
+								public void onException(Downloader d, Exception e) {
+									System.out.println("线程出错：" + d.id + " " + e);
+									if(d.tryTimes < Downloader.MAX_TRY_TIMES) {
+										Downloader dd = new Downloader(d.id, d.raf, d.imgUrl, d.tryTimes + 1, d.callback);
+										executor.execute(dd);
+										System.out.println("线程重试：" + d.id + "第" + d.tryTimes + "次");
+									} else {
+										System.out.println("线程：" + d.id + " 达到最大重试限制，无法下载：" + d.imgUrl);
+									}
+								}
+							};
+	    			    	for(int j = 0; j < images.size(); j++) {
+	    			    		//循环创建下载线程
+	    			    		String imgUrl = images.get(j);
+	    			    		int id = (i - 1) * 100 + j + 1;
+	    			    		RandomAccessFile raf;
+								try {
+									raf = new RandomAccessFile(subDir.getPath()+"\\"+ folderName + String.format("%3d.jpg",j + 1), "rw");
+									Downloader d = new Downloader(id, raf, imgUrl, 1, callback);
+									bw.write(imgUrl);
+									bw.write("\r\n");
+		    			    		executor.execute(d);
+								} catch (FileNotFoundException e1) {
+									e1.printStackTrace();
+								}
+	    			    	}
+	    			    	//写入Bt种子Url
+	    			    	String bt = htmlTool.parseBTSeedUrlFromPost(code);
+	    			    	bw.write("\r\n\r\n" + bt);
+	    			    	bw.flush();
+	    			    	bw.close();
+//	    			    	break;
+					} catch (Exception e1) {
+						e1.printStackTrace();
+					}
+    					System.out.println("线程池中线程数目："+executor.getPoolSize()+"，队列中等待执行的任务数目："+
+       			             executor.getQueue().size()+"，已执行玩别的任务数目："+executor.getCompletedTaskCount());
     				}
-    				 System.out.println("线程池中线程数目："+executor.getPoolSize()+"，队列中等待执行的任务数目："+
-    			             executor.getQueue().size()+"，已执行玩别的任务数目："+executor.getCompletedTaskCount());
-//    				break;
     			}
     		}
+//    		break;
     	}
     	
     	//播放完成提示音
